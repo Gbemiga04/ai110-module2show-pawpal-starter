@@ -5,6 +5,7 @@ classDiagram
         +String frequency
         +int durationMinutes
         +String priority
+        +Date dueDate
         +boolean completed
         +markComplete() void
         +markPending() void
@@ -33,8 +34,11 @@ classDiagram
         +getPendingTasks() List~Task~
         +getCompletedTasks() List~Task~
         +getTasksForPet(pet: Pet) List~Task~
+        +sortByTime(includeCompleted: boolean) List~Task~
+        +filterTasks(completed: boolean, petName: String) List~Task~
         +organizeTasks(includeCompleted: boolean) List~(Pet, Task)~
-        +markTaskCompleted(task: Task) void
+        +detectConflicts(onDate: Date) List~String~
+        +markTaskCompleted(task: Task, today: Date) Task
         +markTaskPending(task: Task) void
     }
 

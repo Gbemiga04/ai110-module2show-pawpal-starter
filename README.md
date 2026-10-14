@@ -47,12 +47,27 @@ pip install -r requirements.txt
 Sample terminal output from running `python main.py`:
 
 ```
-Today's Schedule
-================
-07:00 AM | Mochi (Dog) | Breakfast - 15 min [high; daily]
-07:30 AM | Luna (Cat) | Fresh water - 5 min [medium; daily]
-08:00 AM | Mochi (Dog) | Morning walk - 30 min [high; daily]
-06:00 PM | Luna (Cat) | Evening meal - 10 min [high; daily]
+All tasks sorted by time
+========================
+07:00 AM | Mochi | Breakfast [pending]
+07:30 AM | Luna | Fresh water [pending]
+08:00 AM | Mochi | Morning walk [complete]
+08:00 AM | Mochi | Training [pending]
+08:00 AM | Luna | Medication [pending]
+06:00 PM | Luna | Evening meal [pending]
+
+Pending tasks for Mochi
+=======================
+07:00 AM | Breakfast
+08:00 AM | Training
+
+Completed tasks
+===============
+08:00 AM | Morning walk
+
+Schedule conflict warnings
+==========================
+WARNING: Conflict: Mochi's Training (08:00 AM to 08:15 AM) overlaps Luna's Medication (starts 08:00 AM).
 ```
 
 ## 🧪 Testing PawPal+
@@ -73,14 +88,14 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+Implemented sorting, filtering, conflict detection, and recurring task handling.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.organize_tasks()` | Sort by start time; organize also uses priority and stable tie-breakers. |
+| Filtering | `Scheduler.filter_tasks()`, `get_pending_tasks()`, `get_completed_tasks()`, `get_tasks_for_pet()` | Filter by completion status and/or pet name. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Returns warnings for overlapping pending tasks, including tasks for different pets; completed and future tasks are excluded. |
+| Recurring tasks | `Scheduler.mark_task_completed()` | Completing daily and weekly tasks creates a pending occurrence due tomorrow or in 7 days; as-needed tasks do not repeat automatically. |
 
 ## 📸 Demo Walkthrough
 

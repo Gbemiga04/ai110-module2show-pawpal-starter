@@ -1,7 +1,7 @@
 """Core data models and task management for PawPal+."""
 
 from dataclasses import dataclass, field
-from datetime import time as TimeOfDay
+from datetime import date, datetime, time as TimeOfDay, timedelta
 
 
 @dataclass
@@ -13,6 +13,7 @@ class Task:
     frequency: str
     duration_minutes: int
     priority: str
+    due_date: date = field(default_factory=date.today)
     completed: bool = False
 
     def __post_init__(self) -> None:
@@ -27,6 +28,8 @@ class Task:
             raise ValueError("Task duration must be greater than zero.")
         if self.priority not in {"low", "medium", "high"}:
             raise ValueError("Task priority must be low, medium, or high.")
+        if not isinstance(self.due_date, date):
+            raise TypeError("Task due_date must be a datetime.date value.")
 
     def mark_complete(self) -> None:
         """Mark this task as complete."""
@@ -127,15 +130,47 @@ class Scheduler:
             )
         return pet.get_tasks()
 
+    def sort_by_time(
+        self, include_completed: bool = True
+    ) -> list[Task]:
+        """Sort all owner tasks by start time, optionally including completed tasks."""
+        tasks = [
+            task
+            for task in self.get_all_tasks()
+            if include_completed or not task.completed
+        ]
+        return sorted(tasks, key=lambda task: task.time)
+
+    def filter_tasks(
+        self,
+        *,
+        completed: bool | None = None,
+        pet_name: str | None = None,
+    ) -> list[Task]:
+        """Filter tasks by completion status and a case-insensitive pet name."""
+        normalized_pet_name = pet_name.strip().casefold() if pet_name else None
+        return [
+            task
+            for pet in self.owner.pets
+            for task in pet.tasks
+            if (completed is None or task.completed is completed)
+            and (
+                normalized_pet_name is None
+                or pet.name.casefold() == normalized_pet_name
+            )
+        ]
+
     def organize_tasks(
         self, include_completed: bool = False
     ) -> list[tuple[Pet, Task]]:
-        """Return the owner's tasks ordered by time, pet name, and description."""
+        """Sort due tasks by time, priority, pet name, then description."""
+        today = date.today()
         pet_tasks = [
             (pet, task)
             for pet in self.owner.pets
             for task in pet.tasks
-            if include_completed or not task.completed
+            if task.due_date <= today
+            and (include_completed or not task.completed)
         ]
         return sorted(
             pet_tasks,
@@ -147,11 +182,70 @@ class Scheduler:
             ),
         )
 
-    def mark_task_completed(self, task: Task) -> None:
-        """Mark a task belonging to this owner as complete."""
-        if not any(owned_task is task for owned_task in self.get_all_tasks()):
+    def detect_conflicts(self, on_date: date | None = None) -> list[str]:
+        """Warn about overlapping pending task intervals on the selected date."""
+        schedule_date = on_date or date.today()
+        scheduled_tasks = [
+            (pet, task)
+            for pet in self.owner.pets
+            for task in pet.tasks
+            if task.due_date == schedule_date and not task.completed
+        ]
+        scheduled_tasks.sort(key=lambda item: item[1].time)
+
+        warnings = []
+        for index, (pet, task) in enumerate(scheduled_tasks):
+            task_start = datetime.combine(schedule_date, task.time)
+            task_end = task_start + timedelta(minutes=task.duration_minutes)
+
+            for other_pet, other_task in scheduled_tasks[index + 1 :]:
+                other_start = datetime.combine(schedule_date, other_task.time)
+                if other_start >= task_end:
+                    break
+
+                warnings.append(
+                    f"Conflict: {pet.name}'s {task.description} "
+                    f"({task_start.strftime('%I:%M %p')} to "
+                    f"{task_end.strftime('%I:%M %p')}) overlaps "
+                    f"{other_pet.name}'s {other_task.description} "
+                    f"(starts {other_task.time.strftime('%I:%M %p')})."
+                )
+
+        return warnings
+
+    def mark_task_completed(self, task: Task, today: date | None = None) -> Task | None:
+        """Complete an owned task and append its next daily or weekly occurrence."""
+        pet = next(
+            (
+                pet
+                for pet in self.owner.pets
+                if any(owned_task is task for owned_task in pet.tasks)
+            ),
+            None,
+        )
+        if pet is None:
             raise ValueError("Task does not belong to this owner's pets.")
+        if task.completed:
+            return None
+
         task.mark_complete()
+        recurrence = {
+            "daily": timedelta(days=1),
+            "weekly": timedelta(days=7),
+        }.get(task.frequency.strip().casefold())
+        if recurrence is None:
+            return None
+
+        next_task = Task(
+            description=task.description,
+            time=task.time,
+            frequency=task.frequency,
+            duration_minutes=task.duration_minutes,
+            priority=task.priority,
+            due_date=(today or date.today()) + recurrence,
+        )
+        pet.add_task(next_task)
+        return next_task
 
     def mark_task_pending(self, task: Task) -> None:
         """Mark a task belonging to this owner as not yet complete."""

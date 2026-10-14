@@ -34,8 +34,7 @@ The original draft used `CareTask` and `DailyPlan`. During implementation, I rep
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The conflict detector sorts the day's pending tasks by start time, then compares each task with later tasks until their start time is beyond the first task's end. This makes the overlap check clear and reports all conflicts, but can take quadratic time when many tasks overlap. That tradeoff is reasonable for a pet owner's small daily task list, where readable, complete warnings matter more than optimizing for very large schedules. The scheduler warns about conflicts instead of moving tasks automatically, preserving the owner's chosen times and letting them decide what to change.
 
 ---
 
