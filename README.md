@@ -73,18 +73,27 @@ WARNING: Conflict: Mochi's Training (08:00 AM to 08:15 AM) overlaps Luna's Medic
 ## 🧪 Testing PawPal+
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+The tests cover pet task management, chronological sorting, completion and pet
+filters, daily and weekly recurrence, conflict detection (including simultaneous
+start times), and invalid ownership and task inputs.
 
 ```
-# Paste your pytest output here
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\gbemi\ai110-module2show-pawpal-starter-1
+plugins: anyio-4.15.1
+collected 18 items
+
+test_pawpal_system.py .............                                      [ 72%]
+tests\test_pawpal.py .....                                               [100%]
+
+============================== 18 passed in 0.02s ==============================
 ```
+
+**Confidence level:** ★★★★☆ (4/5) — the core scheduling behaviors and key edge cases pass automated tests; broader interactive and real-world scheduling scenarios still need validation.
 
 ## 📐 Smarter Scheduling
 
