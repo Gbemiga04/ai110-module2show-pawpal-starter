@@ -2,15 +2,26 @@
 
 ## 1. System Design
 
+**Core user actions**
+
+1. The user can enter basic information about themselves and their pet so the app can tailor care planning to them.
+2. The user can add or edit pet care tasks, including each task's duration and priority.
+3. The user can generate and review a daily care plan that accounts for available time, priorities, and preferences, with an explanation of the choices.
+
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The current design uses four classes:
+
+- **Task** stores a care activity's description, scheduled time, frequency, duration, priority, and completion status. Its methods mark it complete or pending.
+- **Pet** stores a pet's name, species, and tasks. Its methods add, remove, and list tasks.
+- **Owner** stores an owner's name and pets. Its methods add or remove pets and retrieve all their tasks.
+- **Scheduler** works with an owner to retrieve tasks across pets, filter by completion or pet, organize tasks by time and priority, and update completion status.
+
+An owner can have multiple pets, each pet can have multiple tasks, and the scheduler retrieves task data through its owner.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+The original draft used `CareTask` and `DailyPlan`. During implementation, I replaced those with the requested `Task` and `Scheduler` classes so task ownership and management across pets are explicit. The scheduler gets tasks from the owner's pets and sorts them by scheduled time, with priority as a tie-breaker. I updated the UML to match the implemented classes.
 
 ---
 
