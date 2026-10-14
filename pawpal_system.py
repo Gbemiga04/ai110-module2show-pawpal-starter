@@ -1,7 +1,25 @@
 """Core data models and task management for PawPal+."""
 
+from __future__ import annotations
+
+import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, time as TimeOfDay, timedelta
+from pathlib import Path
+
+
+def _require_json_object(value: object, field_name: str) -> dict[str, object]:
+    """Return a decoded JSON object or raise a field-specific error."""
+    if not isinstance(value, dict):
+        raise ValueError(f"Expected {field_name} to be a JSON object.")
+    return value
+
+
+def _require_json_string(value: object, field_name: str) -> str:
+    """Return a decoded JSON string or raise a field-specific error."""
+    if not isinstance(value, str):
+        raise ValueError(f"Expected {field_name} to be a string.")
+    return value
 
 
 @dataclass
@@ -98,6 +116,99 @@ class Owner:
         """Return all tasks belonging to this owner's pets."""
         return [task for pet in self.pets for task in pet.tasks]
 
+    def save_to_json(self, path: str | Path) -> None:
+        """Save this owner, pets, and tasks as readable JSON."""
+        data = {
+            "name": self.name,
+            "pets": [
+                {
+                    "name": pet.name,
+                    "species": pet.species,
+                    "tasks": [
+                        {
+                            "description": task.description,
+                            "time": task.time.isoformat(),
+                            "frequency": task.frequency,
+                            "duration_minutes": task.duration_minutes,
+                            "priority": task.priority,
+                            "due_date": task.due_date.isoformat(),
+                            "completed": task.completed,
+                        }
+                        for task in pet.tasks
+                    ],
+                }
+                for pet in self.pets
+            ],
+        }
+        Path(path).write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    @classmethod
+    def load_from_json(cls, path: str | Path) -> Owner:
+        """Load an owner, pets, and tasks from the PawPal JSON format."""
+        data = _require_json_object(
+            json.loads(Path(path).read_text(encoding="utf-8")), "root"
+        )
+        owner_name = _require_json_string(data.get("name"), "owner name")
+        pets_data = data.get("pets")
+        if not isinstance(pets_data, list):
+            raise ValueError("Expected pets to be a JSON array.")
+
+        owner = cls(owner_name)
+        for pet_index, pet_value in enumerate(pets_data):
+            pet_data = _require_json_object(pet_value, f"pets[{pet_index}]")
+            pet_name = _require_json_string(
+                pet_data.get("name"), f"pets[{pet_index}].name"
+            )
+            species = _require_json_string(
+                pet_data.get("species"), f"pets[{pet_index}].species"
+            )
+            tasks_data = pet_data.get("tasks")
+            if not isinstance(tasks_data, list):
+                raise ValueError(f"Expected pets[{pet_index}].tasks to be a JSON array.")
+
+            pet = Pet(pet_name, species)
+            for task_index, task_value in enumerate(tasks_data):
+                task_field = f"pets[{pet_index}].tasks[{task_index}]"
+                task_data = _require_json_object(task_value, task_field)
+                description = _require_json_string(
+                    task_data.get("description"), f"{task_field}.description"
+                )
+                scheduled_time = _require_json_string(
+                    task_data.get("time"), f"{task_field}.time"
+                )
+                frequency = _require_json_string(
+                    task_data.get("frequency"), f"{task_field}.frequency"
+                )
+                duration = task_data.get("duration_minutes")
+                if type(duration) is not int:
+                    raise ValueError(f"Expected {task_field}.duration_minutes to be an integer.")
+                priority = _require_json_string(
+                    task_data.get("priority"), f"{task_field}.priority"
+                )
+                due_date = _require_json_string(
+                    task_data.get("due_date"), f"{task_field}.due_date"
+                )
+                completed = task_data.get("completed")
+                if type(completed) is not bool:
+                    raise ValueError(f"Expected {task_field}.completed to be a boolean.")
+
+                pet.add_task(
+                    Task(
+                        description=description,
+                        time=TimeOfDay.fromisoformat(scheduled_time),
+                        frequency=frequency,
+                        duration_minutes=duration,
+                        priority=priority,
+                        due_date=date.fromisoformat(due_date),
+                        completed=completed,
+                    )
+                )
+            owner.add_pet(pet)
+        return owner
+
 
 @dataclass
 class Scheduler:
@@ -163,7 +274,7 @@ class Scheduler:
     def organize_tasks(
         self, include_completed: bool = False
     ) -> list[tuple[Pet, Task]]:
-        """Sort due tasks by time, priority, pet name, then description."""
+        """Sort due tasks by priority, time, pet name, then description."""
         today = date.today()
         pet_tasks = [
             (pet, task)
@@ -175,12 +286,57 @@ class Scheduler:
         return sorted(
             pet_tasks,
             key=lambda item: (
-                item[1].time,
                 {"high": 0, "medium": 1, "low": 2}[item[1].priority],
+                item[1].time,
                 item[0].name.casefold(),
                 item[1].description.casefold(),
             ),
         )
+
+    def find_next_available_slot(
+        self,
+        duration_minutes: int,
+        on_date: date | None = None,
+        start_time: TimeOfDay = TimeOfDay(6, 0),
+        end_time: TimeOfDay = TimeOfDay(22, 0),
+    ) -> TimeOfDay | None:
+        """Find the earliest free interval within the requested daily window."""
+        if duration_minutes <= 0:
+            raise ValueError("Task duration must be greater than zero.")
+        if start_time >= end_time:
+            raise ValueError("The scheduling window must end after it starts.")
+
+        schedule_date = on_date or date.today()
+        window_start = datetime.combine(schedule_date, start_time)
+        window_end = datetime.combine(schedule_date, end_time)
+        candidate = window_start
+        tasks = sorted(
+            (
+                task
+                for task in self.get_all_tasks()
+                if task.due_date == schedule_date and not task.completed
+            ),
+            key=lambda task: task.time,
+        )
+
+        for task in tasks:
+            task_start = datetime.combine(schedule_date, task.time)
+            task_end = task_start + timedelta(minutes=task.duration_minutes)
+            if task_end <= candidate:
+                continue
+            requested_end = candidate + timedelta(minutes=duration_minutes)
+            if requested_end > window_end:
+                return None
+            if requested_end <= task_start:
+                return candidate.time()
+            if task_start < requested_end:
+                candidate = max(candidate, task_end)
+            if candidate + timedelta(minutes=duration_minutes) > window_end:
+                return None
+
+        if candidate + timedelta(minutes=duration_minutes) <= window_end:
+            return candidate.time()
+        return None
 
     def detect_conflicts(self, on_date: date | None = None) -> list[str]:
         """Warn about overlapping pending task intervals on the selected date."""

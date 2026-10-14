@@ -10,18 +10,18 @@
 
 **a. Initial design**
 
-The current design uses four classes:
+The final design uses four classes:
 
-- **Task** stores a care activity's description, scheduled time, frequency, duration, priority, and completion status. Its methods mark it complete or pending.
+- **Task** stores a care activity's description, scheduled time, frequency, duration, priority, due date, and completion status. Its methods mark it complete or pending.
 - **Pet** stores a pet's name, species, and tasks. Its methods add, remove, and list tasks.
-- **Owner** stores an owner's name and pets. Its methods add or remove pets and retrieve all their tasks.
-- **Scheduler** works with an owner to retrieve tasks across pets, filter by completion or pet, organize tasks by time and priority, and update completion status.
+- **Owner** stores an owner's name and pets. Its methods add or remove pets, retrieve all their tasks, and save/load owner data as JSON.
+- **Scheduler** works with an owner to retrieve and filter tasks, order due work by priority and time, find an open time slot, detect conflicts, and create recurring task instances after completion.
 
 An owner can have multiple pets, each pet can have multiple tasks, and the scheduler retrieves task data through its owner.
 
 **b. Design changes**
 
-The original draft used `CareTask` and `DailyPlan`. During implementation, I replaced those with the requested `Task` and `Scheduler` classes so task ownership and management across pets are explicit. The scheduler gets tasks from the owner's pets and sorts them by scheduled time, with priority as a tie-breaker. I updated the UML to match the implemented classes.
+The original draft used `CareTask` and `DailyPlan`. During implementation, I replaced those with the requested `Task` and `Scheduler` classes so task ownership and management across pets are explicit. I later added task due dates, recurring instances, JSON persistence, a next-available-slot search, and priority-first scheduling, updating the UML and UI to match.
 
 ---
 
@@ -29,8 +29,7 @@ The original draft used `CareTask` and `DailyPlan`. During implementation, I rep
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+My scheduler currently considers each task's due date, scheduled start time, duration, priority, and completion status. It puts due, pending tasks into an ordered schedule, using priority to break ties at the same start time, and checks task intervals for overlaps. I prioritized showing tasks at the right time and warning about conflicts because those behaviors make a daily care list immediately useful. The current version does not yet enforce an owner's total available-time limit or use owner preferences to select tasks; those remain possible improvements rather than implemented constraints.
 
 **b. Tradeoffs**
 
@@ -42,13 +41,11 @@ The conflict detector sorts the day's pending tasks by start time, then compares
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used my AI coding assistant to brainstorm the initial classes, translate the design into Python dataclasses, wire the backend into Streamlit, add scheduling algorithms and persistence, and draft focused tests. Asking for concrete behavior—such as how `timedelta` should create a task due tomorrow, or what edge cases mattered for sorting and recurrence—was more useful than asking for broad code generation. Separate chat sessions for algorithm planning and test planning helped me keep each discussion focused and return to the implementation with a smaller, clearer checklist.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+An early AI-assisted design keyed scheduled times by task title. I changed it so each task stays paired with its time, because two tasks can share a title and otherwise be associated with the wrong time. I also kept conflict detection as a warning rather than letting the scheduler automatically move or discard tasks, which leaves the owner's chosen schedule intact for a human to resolve. I refined the warning to name both pets, tasks, and overlapping times, then used a Streamlit AppTest with two simultaneous tasks to verify that the UI showed the warning and schedule. I also reviewed generated test cases and ran them with `python -m pytest` rather than treating generated code as correct without evidence.
 
 ---
 
@@ -56,13 +53,11 @@ The conflict detector sorts the day's pending tasks by start time, then compares
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I tested adding tasks and collecting them across pets, chronological and priority ordering, completion and pet-name filtering, daily and weekly recurrence, and conflict detection within one pet and across pets. I also tested duplicate start times, completed and future tasks, invalid ownership, and invalid task values. These cases check both ordinary use and situations where a misleading schedule or accidental duplicate would be especially confusing.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I am reasonably confident in the core behaviors because all 24 automated tests pass, and I exercised the UI flow for adding a pet and task, generating a schedule, and showing a conflict warning. I would next test recurrence and conflict warnings through more complete UI scenarios, tasks that cross midnight, empty schedules, and overlapping groups of three or more tasks. I would also add tests for weekly recurrence through the UI and for how an available-time limit should affect the schedule once that feature exists.
 
 ---
 
@@ -70,12 +65,12 @@ The conflict detector sorts the day's pending tasks by start time, then compares
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I am most satisfied that the same Scheduler logic is used by both the command-line demo and the Streamlit app. Sorting, filtering, recurrence, conflict warnings, next-slot suggestions, and persistence are demonstrated by runnable code and tests rather than being only design ideas.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+In another iteration, I would add explicit owner preferences and a user-configurable planning window, then apply them when selecting and suggesting tasks. I would also let users edit and delete tasks in the UI, provide a more deliberate rule for weekly task days, and expand UI tests so changes to the interaction flow are caught automatically.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+I learned that being the lead architect means deciding what the system should do, keeping the model and UI aligned, and checking AI-generated ideas against the requirements and actual behavior. The AI helped me move quickly, but I was responsible for choosing the scope, reviewing tradeoffs, and requiring tests and an interactive check before trusting the result.

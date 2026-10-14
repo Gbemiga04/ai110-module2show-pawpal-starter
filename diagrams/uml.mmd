@@ -26,6 +26,8 @@ classDiagram
         +addPet(pet: Pet) void
         +removePet(pet: Pet) void
         +getAllTasks() List~Task~
+        +saveToJson(path: Path) void
+        +loadFromJson(path: Path) Owner
     }
 
     class Scheduler {
@@ -37,6 +39,7 @@ classDiagram
         +sortByTime(includeCompleted: boolean) List~Task~
         +filterTasks(completed: boolean, petName: String) List~Task~
         +organizeTasks(includeCompleted: boolean) List~(Pet, Task)~
+        +findNextAvailableSlot(durationMinutes: int, onDate: Date, startTime: Time, endTime: Time) Time
         +detectConflicts(onDate: Date) List~String~
         +markTaskCompleted(task: Task, today: Date) Task
         +markTaskPending(task: Task) void
@@ -45,3 +48,5 @@ classDiagram
     Owner "1" --> "0..*" Pet : owns
     Pet "1" --> "0..*" Task : has care tasks
     Scheduler --> Owner : retrieves tasks from
+    Scheduler ..> Pet : filters and organizes by pet
+    Scheduler ..> Task : sorts, schedules, checks, and updates

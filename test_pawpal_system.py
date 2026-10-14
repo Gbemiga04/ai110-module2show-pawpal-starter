@@ -36,7 +36,7 @@ def test_owner_collects_tasks_from_all_pets() -> None:
     assert owner.get_all_tasks() == [dog_task, cat_task]
 
 
-def test_scheduler_organizes_tasks_by_time_then_priority() -> None:
+def test_scheduler_organizes_tasks_by_priority_then_time() -> None:
     owner = Owner("Jordan")
     dog = Pet("Mochi", "dog")
     dog.add_task(make_task("Late", time(9, 0)))
@@ -48,9 +48,23 @@ def test_scheduler_organizes_tasks_by_time_then_priority() -> None:
 
     assert [task.description for _, task in organized] == [
         "Higher priority",
-        "Lower priority",
         "Late",
+        "Lower priority",
     ]
+
+
+def test_scheduler_organizes_high_priority_before_earlier_low_priority() -> None:
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    low_priority = make_task("Breakfast", time(7, 0), priority="low")
+    high_priority = make_task("Medication", time(9, 0), priority="high")
+    pet.add_task(low_priority)
+    pet.add_task(high_priority)
+    owner.add_pet(pet)
+
+    organized = Scheduler(owner).organize_tasks()
+
+    assert [task for _, task in organized] == [high_priority, low_priority]
 
 
 def test_scheduler_sorts_tasks_by_time_and_includes_completed_by_default() -> None:
@@ -215,6 +229,82 @@ def test_scheduler_does_not_report_tasks_that_do_not_overlap_or_are_future() -> 
     owner.add_pet(pet)
 
     assert Scheduler(owner).detect_conflicts(on_date=date.today()) == []
+
+
+def test_next_available_slot_finds_first_gap_between_tasks() -> None:
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    pet.add_task(make_task("Breakfast", time(6, 0)))
+    pet.add_task(make_task("Walk", time(6, 40)))
+    owner.add_pet(pet)
+
+    slot = Scheduler(owner).find_next_available_slot(
+        15, on_date=date.today(), start_time=time(6, 0), end_time=time(8, 0)
+    )
+
+    assert slot == time(6, 20)
+
+
+def test_next_available_slot_moves_after_conflicting_tasks_and_handles_no_room() -> None:
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    pet.add_task(make_task("Walk", time(6, 0)))
+    owner.add_pet(pet)
+    scheduler = Scheduler(owner)
+
+    assert scheduler.find_next_available_slot(
+        15, on_date=date.today(), start_time=time(6, 0), end_time=time(7, 0)
+    ) == time(6, 20)
+    assert scheduler.find_next_available_slot(
+        45, on_date=date.today(), start_time=time(6, 0), end_time=time(7, 0)
+    ) is None
+    with pytest.raises(ValueError, match="greater than zero"):
+        scheduler.find_next_available_slot(0)
+
+
+def test_next_available_slot_does_not_return_gap_past_window_end() -> None:
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    pet.add_task(Task("Late task", time(23, 0), "daily", 10, "high"))
+    owner.add_pet(pet)
+
+    assert Scheduler(owner).find_next_available_slot(
+        31, on_date=date.today(), start_time=time(21, 30), end_time=time(22, 0)
+    ) is None
+
+
+def test_owner_json_round_trip_preserves_pet_and_task_data(tmp_path) -> None:
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    task = Task(
+        "Morning walk",
+        time(8, 30),
+        "weekly",
+        30,
+        "high",
+        due_date=date(2026, 10, 14),
+        completed=True,
+    )
+    pet.add_task(task)
+    owner.add_pet(pet)
+    data_path = tmp_path / "data.json"
+
+    owner.save_to_json(data_path)
+    restored = Owner.load_from_json(data_path)
+
+    assert restored.name == owner.name
+    assert len(restored.pets) == 1
+    assert restored.pets[0].name == pet.name
+    assert restored.pets[0].species == pet.species
+    assert restored.pets[0].tasks == [task]
+
+
+def test_owner_json_load_rejects_invalid_root(tmp_path) -> None:
+    data_path = tmp_path / "invalid.json"
+    data_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="root"):
+        Owner.load_from_json(data_path)
 
 
 def test_scheduler_rejects_pet_or_task_not_owned_by_owner() -> None:

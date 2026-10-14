@@ -24,12 +24,13 @@ def main() -> None:
 
     scheduler = Scheduler(owner)
 
-    print("All tasks sorted by time")
-    print("========================")
-    for task in scheduler.sort_by_time():
-        status = "complete" if task.completed else "pending"
+    print("Today's priority-first schedule")
+    print("===============================")
+    schedule = scheduler.organize_tasks()
+    for pet, task in schedule:
         print(
-            f"{task.time.strftime('%I:%M %p')} | {task.description} [{status}]"
+            f"{task.priority.upper():<6} | {task.time.strftime('%I:%M %p')} | "
+            f"{pet.name:<6} | {task.description:<14} | {task.duration_minutes:>3} min"
         )
 
     print("\nPending tasks for Mochi")
@@ -51,6 +52,10 @@ def main() -> None:
     else:
         print("No conflicts detected.")
 
+    next_slot = scheduler.find_next_available_slot(20)
+    print("\nNext available 20-minute slot")
+    print("=============================")
+    print(next_slot.strftime("%I:%M %p") if next_slot else "No slot available.")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,57 @@
+classDiagram
+    class Task {
+        +String description
+        +Time time
+        +String frequency
+        +int duration_minutes
+        +String priority
+        +Date due_date
+        +boolean completed
+        +__post_init__() void
+        +mark_complete() void
+        +mark_completed() void
+        +mark_pending() void
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +List~Task~ tasks
+        +add_task(task: Task) void
+        +remove_task(task: Task) void
+        +get_tasks() List~Task~
+    }
+
+    class Owner {
+        +String name
+        +List~Pet~ pets
+        +add_pet(pet: Pet) void
+        +remove_pet(pet: Pet) void
+        +get_all_tasks() List~Task~
+        +save_to_json(path: Path) void
+        +load_from_json(path: Path) Owner
+    }
+
+    class Scheduler {
+        +Owner owner
+        +__post_init__() void
+        +get_all_tasks() List~Task~
+        +get_pending_tasks() List~Task~
+        +get_completed_tasks() List~Task~
+        +get_tasks_for_pet(pet: Pet) List~Task~
+        +sort_by_time(include_completed: bool) List~Task~
+        +filter_tasks(completed: bool, pet_name: String) List~Task~
+        +organize_tasks(include_completed: bool) List~(Pet, Task)~
+        +find_next_available_slot(duration_minutes: int, on_date: Date, start_time: Time, end_time: Time) Time
+        +detect_conflicts(on_date: Date) List~String~
+        +mark_task_completed(task: Task, today: Date) Task
+        +mark_task_pending(task: Task) void
+    }
+
+    note for Scheduler "organize_tasks orders priority high-to-low, then time. Optional date/window arguments default to today/6 AM-10 PM. find_next_available_slot returns None when no fit exists. mark_task_completed returns None for already-completed or non-recurring tasks."
+
+    Owner "1" --> "0..*" Pet : owns
+    Pet "1" *-- "0..*" Task : stores
+    Scheduler --> Owner : retrieves tasks from
+    Scheduler ..> Pet : filters and organizes by pet
+    Scheduler ..> Task : sorts, schedules, checks, and updates
